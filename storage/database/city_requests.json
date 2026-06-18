@@ -1,0 +1,22 @@
+[
+    {
+        "id": "6a1577793a4ef",
+        "code": "5339710068",
+        "province": "سیستان و بلوچستان",
+        "city": "شهرکی و ناروئی(زهک)",
+        "suggested_province": "سیستان وبلوچستان",
+        "suggested_city": "شهرکی و ناروئی",
+        "date": "2026-05-26 12:35:37",
+        "status": "approved"
+    },
+    {
+        "id": "6a1a6d692a75b",
+        "code": "5979899677",
+        "province": "سیستان و بلوچستان",
+        "city": "لاشار(اسپکه)",
+        "suggested_province": "سیستان و بلوچستان",
+        "suggested_city": "لاشار اسپکه",
+        "date": "2026-05-30 06:54:01",
+        "status": "approved"
+    }
+]

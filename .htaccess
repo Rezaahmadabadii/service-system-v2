@@ -1,0 +1,15 @@
+# .htaccess
+RewriteEngine On
+
+# جلوگیری از دسترسی مستقیم به فایل‌های حساس
+<FilesMatch "\.(log|json|txt|ini)$">
+    Require all denied
+</FilesMatch>
+
+# تنظیم پیش‌فرض برای index.php
+DirectoryIndex index.php
+
+# حذف index.php از URL (اختیاری)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
