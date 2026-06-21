@@ -719,9 +719,50 @@ if (isset($_GET['ajax'])) {
             word-break: break-all;
             border-right: 3px solid #f9a825;
         }
-        /* =============================================== */
 
-        /* ==================================== */
+        /* ========== استایل لوگو با انیمیشن زوم و محو نرم ========== */
+        .footer img {
+            max-height: 40px;
+            width: auto;
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            cursor: pointer;
+            position: relative;
+        }
+
+        .footer img:hover {
+            transform: scale(1.5);
+        }
+
+        .footer img.zoom-fade {
+            animation: zoomFadeOut 3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
+        @keyframes zoomFadeOut {
+            0% {
+                transform: scale(1.5);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(12);
+                opacity: 0;
+            }
+        }
+
+        .footer img.zoom-fade-back {
+            animation: zoomFadeIn 2.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        @keyframes zoomFadeIn {
+            0% {
+                transform: scale(0.1);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        /* ======================================================== */
     </style>
 </head>
 <body>
@@ -729,7 +770,7 @@ if (isset($_GET['ajax'])) {
     <div class="header">
         <div class="logo">
             <h1><i class="fas fa-id-card"></i> اعتبارسنجی کدملی و استعلام اطلاعات کد های تفصیل ثبت شده در برهان</h1>
-            <p>اعتبارسنجی | تشخیص استان و شهر | جستجو در اکسل کدهای تفصیل برهان</p>
+            <p>اعتبارسنجی | تشخیص استان و شهر | جستجو در دیتابیس کدهای تفصیل برهان</p>
         </div>
         <div class="menu-buttons">
             <div style="font-size: 0.7rem; color: #2c3e50; background: #e9ecef; padding: 6px 12px; border-radius: 20px; display: inline-flex; align-items: center; gap: 6px;">
@@ -808,7 +849,7 @@ if (isset($_GET['ajax'])) {
     <div class="footer">
         <p><i class="fas fa-code"></i> Dev : Reza.ahmadabadi | <i class="fas fa-phone"></i> 09353984864</p>
         <div style="margin-top: 10px;">
-            <img src="/invoice-system-v2/assets/images/logo.png" alt="لوگو" style="max-height: 40px; width: auto;" onerror="this.style.display='none'">
+            <img src="/invoice-system-v2/assets/images/logo.png" alt="لوگو" style="max-height: 40px; width: auto; transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); cursor: pointer; position: relative;" onmouseover="this.style.transform='scale(1.5)'" onmouseout="this.style.transform='scale(1)'" onerror="this.style.display='none'">
         </div>
     </div>
 </div>
@@ -1437,6 +1478,35 @@ window.onclick = function(e) {
     if (e.target === requestCityModal) closeRequestModal();
     if (e.target === document.getElementById('requestNationalCodeModal')) closeNationalCodeRequestModal();
 };
+
+// ==================== انیمیشن زوم و محو لوگو ====================
+document.addEventListener('DOMContentLoaded', function() {
+    const logo = document.querySelector('.footer img');
+    if (logo) {
+        logo.addEventListener('click', function(e) {
+            // جلوگیری از چندبار کلیک همزمان
+            if (this.classList.contains('zoom-fade')) return;
+            
+            // حذف کلاس‌های قبلی
+            this.classList.remove('zoom-fade', 'zoom-fade-back');
+            
+            // اجرای انیمیشن محو شدن
+            this.classList.add('zoom-fade');
+            
+            // بعد از پایان محو شدن (2 ثانیه)، شروع به بازگشت کن
+            setTimeout(() => {
+                this.classList.remove('zoom-fade');
+                this.classList.add('zoom-fade-back');
+            }, 2000);
+            
+            // بعد از بازگشت (1.5 ثانیه)، کلاس بازگشت را حذف کن
+            setTimeout(() => {
+                this.classList.remove('zoom-fade-back');
+            }, 3500);
+        });
+    }
+});
+
 </script>
 </body>
 </html>

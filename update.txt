@@ -1,0 +1,4 @@
+cd /c/xampp/htdocs/service-system-v2
+git add .
+git commit -m "توضیح تغییراتی که انجام دادید"
+git push origin main
