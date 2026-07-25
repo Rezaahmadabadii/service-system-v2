@@ -6,7 +6,16 @@ require_once __DIR__ . '/../Core/Services/InquiryService.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-// دریافت IP کاربر
+// ==================== دریافت action ====================
+$action = $_GET['action'] ?? '';
+
+// اگر action خالی بود، خطا برگردان
+if (empty($action)) {
+    echo json_encode(['success' => false, 'error' => 'عملیات مشخص نشده است']);
+    exit;
+}
+
+// ==================== توابع کمکی ====================
 function getUserIP() {
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     if (isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
@@ -15,7 +24,6 @@ function getUserIP() {
     return trim($ip);
 }
 
-// بررسی دسترسی IP
 function checkIPAccess($ip, $requiredAccess = 'search') {
     $ipFile = __DIR__ . '/../storage/security/allowed_ips.txt';
     if (!file_exists($ipFile)) {
@@ -30,10 +38,15 @@ function checkIPAccess($ip, $requiredAccess = 'search') {
         $line = trim($line);
         if (empty($line) || strpos($line, '#') === 0) continue;
         
-        if ($line === $ip) {
+        // حذف کامنت‌های درون خط
+        $parts = explode('#', $line);
+        $cleanLine = trim($parts[0]);
+        if (empty($cleanLine)) continue;
+        
+        if ($cleanLine === $ip) {
             $hasSearchAccess = true;
         }
-        if ($line === $ip . '*') {
+        if ($cleanLine === $ip . '*') {
             $hasSearchAccess = true;
             $hasFullAccess = true;
         }
@@ -50,77 +63,9 @@ function checkIPAccess($ip, $requiredAccess = 'search') {
     return ['allowed' => false, 'has_full_access' => false];
 }
 
-// ============================================
-// پردازش درخواست‌ها
-// ============================================
-
-$action = $_GET['action'] ?? '';
-
-if (empty($action)) {
-    echo json_encode(['success' => false, 'error' => 'عملیات مشخص نشده است']);
-    exit;
-}
-
 $ip = getUserIP();
 $config = require __DIR__ . '/../config/app.php';
 $inquiryService = new Core\Services\InquiryService($config['inquiry_base_path']);
-
-// ============================================
-// جستجوی نام
-// ============================================
-if ($action === 'search') {
-    $name = $_GET['name'] ?? '';
-    $year = $_GET['year'] ?? '';
-    $month = $_GET['month'] ?? '';
-    $day = $_GET['day'] ?? null;
-    
-    if (empty($name) || empty($year) || empty($month)) {
-        echo json_encode(['success' => false, 'error' => 'نام، سال و ماه الزامی است']);
-        exit;
-    }
-    
-    // بررسی دسترسی IP
-    $access = checkIPAccess($ip, 'search');
-    if (!$access['allowed']) {
-        echo json_encode(['success' => false, 'error' => 'شما دسترسی به این بخش ندارید']);
-        exit;
-    }
-    
-    $filePath = $inquiryService->findFile($year, $month);
-    if (!$filePath) {
-        echo json_encode(['success' => false, 'error' => 'فایلی برای سال و ماه مورد نظر یافت نشد']);
-        exit;
-    }
-    
-    $results = $inquiryService->searchInFile($filePath, $name, $day);
-    
-    // ذخیره تاریخچه
-    $historyFile = __DIR__ . '/../storage/logs/search_history.json';
-    $history = [];
-    if (file_exists($historyFile)) {
-        $history = json_decode(file_get_contents($historyFile), true) ?? [];
-    }
-    
-    $history[] = [
-        'date' => date('Y-m-d H:i:s'),
-        'ip' => $ip,
-        'search_term' => $name,
-        'year' => $year,
-        'month' => $month,
-        'day' => $day,
-        'results_count' => count($results)
-    ];
-    
-    file_put_contents($historyFile, json_encode($history, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-    
-    echo json_encode([
-        'success' => true,
-        'results' => $results,
-        'count' => count($results),
-        'file' => basename($filePath)
-    ], JSON_UNESCAPED_UNICODE);
-    exit;
-}
 
 // ============================================
 // دریافت سال‌های موجود
@@ -154,7 +99,140 @@ if ($action === 'get_months') {
     }
     
     $months = $inquiryService->getAvailableMonths($year);
-    echo json_encode(['success' => true, 'months' => $months]);
+    
+    // تبدیل ماه‌ها به لیست با نام فارسی
+    $monthNames = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+    $monthList = [];
+    foreach ($months as $m) {
+        $monthList[] = [
+            'value' => $m,
+            'label' => $m . ' - ' . $monthNames[$m - 1]
+        ];
+    }
+    
+    echo json_encode(['success' => true, 'months' => $monthList]);
+    exit;
+}
+
+// ============================================
+// جستجوی نام - با محدودیت تاریخ جاری
+// ============================================
+if ($action === 'search') {
+    $name = $_GET['name'] ?? '';
+    $year = $_GET['year'] ?? '';
+    $month = $_GET['month'] ?? '';
+    $day = $_GET['day'] ?? null;
+    
+    // فقط نام و سال الزامی هستند - ماه اختیاری است
+    if (empty($name) || empty($year)) {
+        echo json_encode(['success' => false, 'error' => 'نام و سال الزامی است']);
+        exit;
+    }
+    
+    if (strlen($name) < 2) {
+        echo json_encode(['success' => false, 'error' => 'نام باید حداقل ۲ کاراکتر باشد']);
+        exit;
+    }
+    
+    $access = checkIPAccess($ip, 'search');
+    if (!$access['allowed']) {
+        echo json_encode(['success' => false, 'error' => 'شما دسترسی به این بخش ندارید']);
+        exit;
+    }
+    
+    // دریافت تاریخ جاری شمسی
+    list($currentYear, $currentMonth, $currentDay) = $inquiryService->getJalaliToday();
+    
+    // اگر ماه خالی بود، همه ماه‌ها رو جستجو کن
+    if (empty($month)) {
+        $availableMonths = $inquiryService->getAvailableMonths($year);
+        
+        if (empty($availableMonths)) {
+            echo json_encode([
+                'success' => true, 
+                'results' => [], 
+                'count' => 0, 
+                'file' => 'همه ماه‌ها'
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        
+        $allResults = [];
+        foreach ($availableMonths as $m) {
+            $filePath = $inquiryService->findFile($year, $m);
+            if ($filePath) {
+                $results = $inquiryService->searchInFile($filePath, $name, $day);
+                
+                // اعمال محدودیت تاریخ برای ماه جاری
+                if ($year == $currentYear && $m == $currentMonth) {
+                    $results = array_filter($results, function($item) use ($currentDay) {
+                        return intval($item['day']) <= $currentDay;
+                    });
+                    // بازآرایه‌سازی ایندکس‌ها بعد از فیلتر
+                    $results = array_values($results);
+                }
+                
+                $allResults = array_merge($allResults, $results);
+            }
+        }
+        
+        $results = $allResults;
+        $searchedFile = 'همه ماه‌ها';
+    } else {
+        // جستجو در یک ماه خاص
+        $filePath = $inquiryService->findFile($year, $month);
+        if (!$filePath) {
+            echo json_encode([
+                'success' => true, 
+                'results' => [], 
+                'count' => 0, 
+                'file' => 'فایل یافت نشد'
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $results = $inquiryService->searchInFile($filePath, $name, $day);
+        
+        // اعمال محدودیت تاریخ برای ماه جاری
+        if ($year == $currentYear && $month == $currentMonth) {
+            $results = array_filter($results, function($item) use ($currentDay) {
+                return intval($item['day']) <= $currentDay;
+            });
+            // بازآرایه‌سازی ایندکس‌ها بعد از فیلتر
+            $results = array_values($results);
+        }
+        
+        $searchedFile = basename($filePath);
+    }
+    
+    // ذخیره تاریخچه
+    $historyFile = __DIR__ . '/../storage/logs/search_history.json';
+    $history = [];
+    if (file_exists($historyFile)) {
+        $history = json_decode(file_get_contents($historyFile), true) ?? [];
+    }
+    
+    $history[] = [
+        'date' => date('Y-m-d H:i:s'),
+        'ip' => $ip,
+        'search_term' => $name,
+        'year' => $year,
+        'month' => $month ?: 'همه ماه‌ها',
+        'day' => $day,
+        'results_count' => count($results)
+    ];
+    
+    if (count($history) > 1000) {
+        $history = array_slice($history, -1000);
+    }
+    
+    file_put_contents($historyFile, json_encode($history, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    
+    echo json_encode([
+        'success' => true,
+        'results' => $results,
+        'count' => count($results),
+        'file' => $searchedFile
+    ], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -177,6 +255,12 @@ if ($action === 'today_all') {
     }
     
     $results = $inquiryService->getAllTransfersForDate($year, $month, $day);
+    
+    // فقط روز جاری (امروز) رو نمایش بده
+    $results = array_filter($results, function($item) use ($day) {
+        return intval($item['day']) == $day;
+    });
+    $results = array_values($results);
     
     echo json_encode([
         'success' => true,
@@ -208,6 +292,12 @@ if ($action === 'yesterday_all') {
     
     $results = $inquiryService->getAllTransfersForDate($year, $month, $day);
     
+    // فقط روز دیروز رو نمایش بده
+    $results = array_filter($results, function($item) use ($day) {
+        return intval($item['day']) == $day;
+    });
+    $results = array_values($results);
+    
     echo json_encode([
         'success' => true,
         'results' => $results,
@@ -219,7 +309,29 @@ if ($action === 'yesterday_all') {
 }
 
 // ============================================
+// دریافت تاریخچه جستجوها
+// ============================================
+if ($action === 'get_history') {
+    $access = checkIPAccess($ip, 'search');
+    if (!$access['allowed']) {
+        echo json_encode(['success' => false, 'error' => 'شما دسترسی به این بخش ندارید']);
+        exit;
+    }
+    
+    $historyFile = __DIR__ . '/../storage/logs/search_history.json';
+    $history = [];
+    if (file_exists($historyFile)) {
+        $history = json_decode(file_get_contents($historyFile), true) ?? [];
+        $history = array_reverse($history);
+    }
+    
+    echo json_encode(['success' => true, 'history' => $history]);
+    exit;
+}
+
+// ============================================
 // عملیات نامشخص
 // ============================================
 echo json_encode(['success' => false, 'error' => 'عملیات نامشخص']);
 exit;
+?>

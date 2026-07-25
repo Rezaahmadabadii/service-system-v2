@@ -1,5 +1,5 @@
 <?php
-// index.php - نسخه نهایی با دکمه درخواست اضافه/اصلاح کد ملی (سه رقم) و لاگ جستجوها
+// index.php - نسخه نهایی بدون خط موج‌دار
 
 error_reporting(E_ALL & ~E_WARNING & ~E_DEPRECATED);
 
@@ -234,8 +234,7 @@ if (isset($_GET['ajax'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>اعتبارسنجی کد ملی و استعلام در برهان</title>
-	<link rel="icon" type="image/x-icon" href="/service-system-v2/favicon.ico">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/x-icon" href="/service-system-v2/favicon.ico">
     <style>
         * {
             margin: 0;
@@ -245,20 +244,38 @@ if (isset($_GET['ajax'])) {
         
         body {
             font-family: 'Segoe UI', Tahoma, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             direction: rtl;
             min-height: 100vh;
             padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+            background: #ffffff;
+        }
+        
+        /* ========== پس‌زمینه زرد ملایم ========== */
+        .bg-glow {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            background-image: radial-gradient(circle at center, #FFF991 0%, transparent 70%);
+            opacity: 0.6;
+            mix-blend-mode: multiply;
         }
         
         .container {
             max-width: 1400px;
             margin: 0 auto;
+            position: relative;
+            z-index: 1;
         }
         
         .header {
-            background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(10px);
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(20px);
             border-radius: 20px;
             padding: 16px 24px;
             margin-bottom: 20px;
@@ -267,26 +284,25 @@ if (isset($_GET['ajax'])) {
             align-items: center;
             flex-wrap: wrap;
             gap: 16px;
-            border: 1px solid rgba(255,255,255,0.2);
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.5);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.04);
         }
         
         .logo h1 {
             font-size: 1.3rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: #2d3436;
         }
         
         .logo p {
             font-size: 0.7rem;
-            color: #6c757d;
+            color: #636e72;
         }
         
         .menu-buttons {
             display: flex;
             gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
         }
         
         .menu-btn {
@@ -310,41 +326,326 @@ if (isset($_GET['ajax'])) {
             box-shadow: 0 5px 20px rgba(102,126,234,0.4);
         }
         
+        /* ============================================
+           استایل کارت‌های گلو (Glow Card)
+           ============================================ */
+        .glow-card {
+            --base: 220;
+            --spread: 200;
+            --radius: 20;
+            --border: 2;
+            --backdrop: rgba(255,255,255,0.7);
+            --backup-border: rgba(255,255,255,0.3);
+            --size: 200;
+            --outer: 1;
+            --border-size: calc(var(--border) * 1px);
+            --spotlight-size: calc(var(--size) * 1px);
+            --hue: calc(var(--base) + (var(--xp, 0) * var(--spread, 0)));
+            
+            position: relative;
+            touch-action: none;
+            border: var(--border-size) solid var(--backup-border);
+            border-radius: calc(var(--radius) * 1px);
+            background: var(--backdrop);
+            background-image: radial-gradient(
+                var(--spotlight-size) var(--spotlight-size) at
+                calc(var(--x, 0) * 1px)
+                calc(var(--y, 0) * 1px),
+                hsl(var(--hue, 210) 100% 70% / 0.08),
+                transparent
+            );
+            background-size: calc(100% + (2 * var(--border-size))) calc(100% + (2 * var(--border-size)));
+            background-position: 50% 50%;
+            background-attachment: fixed;
+            padding: 0;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            overflow: hidden;
+            min-height: 200px;
+        }
+
+        .glow-card::before,
+        .glow-card::after {
+            pointer-events: none;
+            content: "";
+            position: absolute;
+            inset: calc(var(--border-size) * -1);
+            border: var(--border-size) solid transparent;
+            border-radius: calc(var(--radius) * 1px);
+            background-attachment: fixed;
+            background-size: calc(100% + (2 * var(--border-size))) calc(100% + (2 * var(--border-size)));
+            background-repeat: no-repeat;
+            background-position: 50% 50%;
+            mask: linear-gradient(transparent, transparent), linear-gradient(white, white);
+            mask-clip: padding-box, border-box;
+            mask-composite: intersect;
+            transition: all 0.3s ease;
+        }
+
+        .glow-card::before {
+            background-image: radial-gradient(
+                calc(var(--spotlight-size) * 0.75) calc(var(--spotlight-size) * 0.75) at
+                calc(var(--x, 0) * 1px)
+                calc(var(--y, 0) * 1px),
+                hsl(var(--hue, 210) 100% 50% / 0.6),
+                transparent 100%
+            );
+            filter: brightness(2);
+        }
+
+        .glow-card::after {
+            background-image: radial-gradient(
+                calc(var(--spotlight-size) * 0.5) calc(var(--spotlight-size) * 0.5) at
+                calc(var(--x, 0) * 1px)
+                calc(var(--y, 0) * 1px),
+                hsl(0 100% 100% / 0.3),
+                transparent 100%
+            );
+        }
+
+        .glow-card .glow-inner {
+            position: absolute;
+            inset: 0;
+            will-change: filter;
+            opacity: var(--outer, 1);
+            border-radius: calc(var(--radius) * 1px);
+            pointer-events: none;
+            border: none;
+            background: none;
+        }
+
+        .glow-card .glow-inner::before {
+            content: '';
+            position: absolute;
+            inset: -10px;
+            border-radius: calc(var(--radius) * 1px);
+            border-width: 10px;
+            border-style: solid;
+            border-color: transparent;
+            background: radial-gradient(
+                calc(var(--spotlight-size) * 0.6) calc(var(--spotlight-size) * 0.6) at
+                calc(var(--x, 0) * 1px)
+                calc(var(--y, 0) * 1px),
+                hsl(var(--hue, 210) 100% 60% / 0.15),
+                transparent 100%
+            );
+            filter: blur(20px);
+        }
+
+        .glow-card.blue { --base: 220; --spread: 200; }
+        .glow-card.purple { --base: 280; --spread: 300; }
+        .glow-card.green { --base: 120; --spread: 200; }
+        .glow-card.red { --base: 0; --spread: 200; }
+        .glow-card.orange { --base: 30; --spread: 200; }
+
+        .glow-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+        }
+
+        .glow-card .column-header {
+            background: transparent;
+            padding: 18px 20px 10px 20px;
+            color: #2d3436;
+            font-weight: 700;
+            font-size: 0.9rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .glow-card .column-body {
+            padding: 10px 20px 20px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .glow-card .column-header .icon {
+            font-size: 1.2rem;
+            margin-left: 8px;
+        }
+
+        /* ============================================
+           دکمه پاک کردن فیلد (Bluetooth Style)
+           ============================================ */
+        .clear-btn-wrap {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .clear-btn-wrap .clear-btn-input {
+            display: none;
+        }
+
+        .clear-btn-wrap .clear-btn {
+            position: relative;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 2px solid rgba(239, 68, 68, 0.2);
+            background: linear-gradient(145deg, #ffffff, #f0f0f5);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            outline: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+
+        .clear-btn-wrap .clear-btn:hover {
+            transform: scale(1.08);
+            border-color: rgba(239, 68, 68, 0.5);
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.15);
+        }
+
+        .clear-btn-wrap .clear-btn:active {
+            transform: scale(0.92);
+        }
+
+        .clear-btn-wrap .clear-btn .corner {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 1px solid rgba(239, 68, 68, 0.06);
+            pointer-events: none;
+        }
+
+        .clear-btn-wrap .clear-btn .inner {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .clear-btn-wrap .clear-btn .inner .icon {
+            width: 20px;
+            height: 20px;
+            color: #ef4444;
+            transition: all 0.3s ease;
+        }
+
+        .clear-btn-wrap .clear-btn:hover .inner .icon {
+            transform: scale(1.1);
+        }
+
+        .clear-btn-wrap .led {
+            position: absolute;
+            top: -3px;
+            right: -3px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(239, 68, 68, 0.2);
+            transition: all 0.3s ease;
+            z-index: 3;
+        }
+
+        .clear-btn-wrap .clear-btn:hover .led {
+            background: #ef4444;
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+        }
+
+        .clear-btn-wrap .bg {
+            position: absolute;
+            inset: -8px;
+            border-radius: 50%;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .clear-btn-wrap .bg .shine-1 {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent 60%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .clear-btn-wrap .clear-btn:hover .bg .shine-1 {
+            opacity: 1;
+        }
+
+        .clear-btn-wrap .bg .shine-2 {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 70% 70%, rgba(239, 68, 68, 0.05), transparent 60%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .clear-btn-wrap .clear-btn:hover .bg .shine-2 {
+            opacity: 1;
+        }
+
+        .clear-btn-wrap .bg-glow {
+            position: absolute;
+            inset: -12px;
+            border-radius: 50%;
+            filter: blur(16px);
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+
+        .clear-btn-wrap .clear-btn:hover .bg-glow {
+            opacity: 1;
+            background: rgba(239, 68, 68, 0.04);
+        }
+
+        .clear-btn-wrap .noise {
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        .clear-btn-wrap .clear-btn:hover .noise {
+            opacity: 0.3;
+        }
+
+        .clear-btn-wrap .noise svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .clear-btn-wrap .clear-btn .ripple {
+            position: absolute;
+            inset: -6px;
+            border-radius: 50%;
+            border: 3px solid #ef4444;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .clear-btn-wrap .clear-btn:active .ripple {
+            animation: ripplePing 0.4s ease-out;
+        }
+
+        @keyframes ripplePing {
+            0% {
+                transform: scale(0.8);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1.8);
+                opacity: 0;
+            }
+        }
+        
         .three-columns {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 20px;
             margin-bottom: 20px;
-        }
-        
-        .column {
-            background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            overflow: hidden;
-            border: 1px solid rgba(255,255,255,0.2);
-            transition: all 0.3s ease;
-        }
-        
-        .column:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-        }
-        
-        .column-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 14px 18px;
-            color: white;
-            font-weight: 600;
-            font-size: 0.85rem;
-        }
-        
-        .column-header i {
-            margin-left: 8px;
-        }
-        
-        .column-body {
-            padding: 18px;
         }
         
         .form-group {
@@ -356,12 +657,13 @@ if (isset($_GET['ajax'])) {
             margin-bottom: 6px;
             font-weight: 500;
             font-size: 0.75rem;
-            color: #2c3e50;
+            color: #2d3436;
         }
         
         .input-wrapper {
             display: flex;
             gap: 8px;
+            align-items: center;
         }
         
         input[type="text"] {
@@ -372,7 +674,13 @@ if (isset($_GET['ajax'])) {
             font-size: 0.85rem;
             font-family: monospace;
             transition: all 0.3s ease;
-            background: #f8f9fa;
+            background: rgba(255,255,255,0.7);
+            color: #2d3436;
+            height: 44px;
+        }
+        
+        input[type="text"]::placeholder {
+            color: #adb5bd;
         }
         
         input[type="text"]:focus {
@@ -382,33 +690,19 @@ if (isset($_GET['ajax'])) {
             box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
         }
         
-        .clear-btn {
-            background: #e74c3c;
-            color: white;
-            border: none;
-            border-radius: 12px;
-            padding: 0 14px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .clear-btn:hover {
-            background: #c0392b;
-            transform: scale(1.02);
-        }
-        
         .small-text {
             font-size: 0.65rem;
-            color: #6c757d;
+            color: #636e72;
             margin-top: 6px;
         }
         
         .result-container {
-            background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(10px);
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(20px);
             border-radius: 20px;
             overflow: hidden;
-            border: 1px solid rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.5);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.04);
         }
         
         .result-header {
@@ -464,6 +758,7 @@ if (isset($_GET['ajax'])) {
             font-size: 0.9rem;
             font-weight: 600;
             margin-bottom: 10px;
+            color: #2d3436;
         }
         
         .location-box {
@@ -483,6 +778,8 @@ if (isset($_GET['ajax'])) {
             font-family: inherit;
             font-size: 0.8rem;
             margin: 8px 0;
+            background: white;
+            color: #2d3436;
         }
         
         .city-code-result {
@@ -634,12 +931,108 @@ if (isset($_GET['ajax'])) {
             color: white;
         }
         
+        /* ========== استایل فوتر ========== */
         .footer {
             text-align: center;
             padding: 16px;
             margin-top: 20px;
-            color: rgba(255,255,255,0.8);
+            color: #636e72;
             font-size: 0.65rem;
+        }
+
+        .footer img {
+            max-height: 40px;
+            width: auto;
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            cursor: pointer;
+            position: relative;
+        }
+
+        .footer img:hover {
+            transform: scale(1.5);
+        }
+
+        .footer img.zoom-fade {
+            animation: zoomFadeOut 3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
+        @keyframes zoomFadeOut {
+            0% { transform: scale(1.5); opacity: 1; }
+            100% { transform: scale(12); opacity: 0; }
+        }
+
+        .footer img.zoom-fade-back {
+            animation: zoomFadeIn 2.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        @keyframes zoomFadeIn {
+            0% { transform: scale(0.1); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* ============================================
+           انیمیشن Vaporize برای متن فوتر
+           ============================================ */
+        .footer-text-vaporize {
+            display: inline-block;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .footer-text-vaporize .char {
+            display: inline-block;
+            opacity: 1;
+            transition: none;
+        }
+
+        .footer-text-vaporize .dev-label {
+            color: #adb5bd;
+        }
+
+        .footer-text-vaporize .highlight {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+        }
+
+        .footer-text-vaporize .dev-phone {
+            color: #2d3436;
+        }
+
+        .footer-text-vaporize.vaporizing .char {
+            animation: vaporizeChar 1.2s ease-out forwards;
+        }
+
+        .footer-text-vaporize.fading-in .char {
+            animation: fadeInChar 0.8s ease-in forwards;
+        }
+
+        @keyframes vaporizeChar {
+            0% {
+                opacity: 1;
+                transform: translate(0, 0) scale(1) rotate(0deg);
+                filter: blur(0px);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(var(--tx, 50px), var(--ty, -30px)) scale(0.2) rotate(var(--rot, 180deg));
+                filter: blur(6px);
+            }
+        }
+
+        @keyframes fadeInChar {
+            0% {
+                opacity: 0;
+                transform: translateY(20px) scale(0.5);
+                filter: blur(4px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+                filter: blur(0px);
+            }
         }
         
         @media (max-width: 1000px) {
@@ -669,7 +1062,7 @@ if (isset($_GET['ajax'])) {
         .fade-in {
             animation: fadeIn 0.3s ease;
         }
-		        /* ========== استایل صفحه‌بندی ========== */
+
         .pagination {
             display: flex;
             justify-content: center;
@@ -686,6 +1079,7 @@ if (isset($_GET['ajax'])) {
             cursor: pointer;
             font-size: 0.75rem;
             transition: all 0.2s ease;
+            color: #2d3436;
         }
         
         .page-btn:hover {
@@ -699,8 +1093,7 @@ if (isset($_GET['ajax'])) {
             color: white;
             border-color: #667eea;
         }
-        
-        /* ========== استایل انتخاب شهر و نتیجه ========== */
+
         .city-selector {
             background: #fff3e0;
             padding: 12px;
@@ -719,117 +1112,184 @@ if (isset($_GET['ajax'])) {
             word-break: break-all;
             border-right: 3px solid #f9a825;
         }
-
-        /* ========== استایل لوگو با انیمیشن زوم و محو نرم ========== */
-        .footer img {
-            max-height: 40px;
-            width: auto;
-            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-            cursor: pointer;
-            position: relative;
+        
+        /* ========== استایل توضیحات زیر فیلدها ========== */
+        .small-text {
+            color: #636e72;
         }
-
-        .footer img:hover {
-            transform: scale(1.5);
-        }
-
-        .footer img.zoom-fade {
-            animation: zoomFadeOut 3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-        }
-
-        @keyframes zoomFadeOut {
-            0% {
-                transform: scale(1.5);
-                opacity: 1;
-            }
-            100% {
-                transform: scale(12);
-                opacity: 0;
-            }
-        }
-
-        .footer img.zoom-fade-back {
-            animation: zoomFadeIn 2.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
-
-        @keyframes zoomFadeIn {
-            0% {
-                transform: scale(0.1);
-                opacity: 0;
-            }
-            100% {
-                transform: scale(1);
-                opacity: 1;
-            }
-        }
-        /* ======================================================== */
     </style>
 </head>
 <body>
+
+<!-- ========== پس‌زمینه زرد ملایم ========== -->
+<div class="bg-glow"></div>
+
 <div class="container">
     <div class="header">
         <div class="logo">
-            <h1><i class="fas fa-id-card"></i> اعتبارسنجی کدملی و استعلام اطلاعات کد های تفصیل ثبت شده در برهان</h1>
-            <p>اعتبارسنجی | تشخیص استان و شهر | جستجو در دیتابیس کدهای تفصیل برهان</p>
+            <h1>🪪 اعتبارسنجی کدملی و استعلام اطلاعات کد های تفصیل ثبت شده در برهان</h1>
+            <p>✅ اعتبارسنجی | 🗺️ تشخیص استان و شهر | 📊 جستجو در دیتابیس کدهای تفصیل برهان</p>
         </div>
         <div class="menu-buttons">
             <div style="font-size: 0.7rem; color: #2c3e50; background: #e9ecef; padding: 6px 12px; border-radius: 20px; display: inline-flex; align-items: center; gap: 6px;">
-                <i class="fas fa-calendar-alt"></i> آخرین بروزرسانی: <span id="lastUpdateDate">---</span>
+                📅 آخرین بروزرسانی: <span id="lastUpdateDate">---</span>
             </div>
             <button class="menu-btn" id="refreshCacheBtn" style="background:#e67e22;">
-                <i class="fas fa-sync-alt"></i> بروزرسانی کدهای تفصیل
+                🔄 بروزرسانی کدهای تفصیل
             </button>
             <button class="menu-btn" onclick="openAdminModal()">
-                <i class="fas fa-lock"></i> پنل مدیریت
+                🔒 پنل مدیریت
             </button>
+            <a href="inquiry_panel.php" class="menu-btn" style="background:linear-gradient(135deg,#27ae60 0%,#2ecc71 100%);">
+                📄 استعلام واریزی‌ها
+            </a>
         </div>
     </div>
     
     <div class="three-columns">
-        <div class="column">
+        <!-- ========== ستون اول - کارت آبی ========== -->
+        <div class="glow-card blue">
+            <div class="glow-inner"></div>
             <div class="column-header">
-                <i class="fas fa-id-card"></i> استعلام و اعتبارسنجی کد ملی (جستجوی خودکار در برهان)
+                <span class="icon">🪪</span> استعلام و اعتبارسنجی کد ملی (جستجوی خودکار در برهان)
             </div>
             <div class="column-body">
                 <div class="form-group">
                     <label>کد ملی ۱۰ رقمی</label>
                     <div class="input-wrapper">
                         <input type="text" id="nationalCode" maxlength="10" placeholder="مثال: 0630010099">
-                        <button type="button" class="clear-btn" id="clearNationalBtn"><i class="fas fa-times"></i></button>
+                        <div class="clear-btn-wrap">
+                            <input id="clearNationalBtn" class="clear-btn-input" type="checkbox" />
+                            <button class="clear-btn" onclick="clearInput(this)">
+                                <div class="corner"></div>
+                                <div class="inner">
+                                    <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+                                    </svg>
+                                </div>
+                                <div class="led"></div>
+                                <div class="bg">
+                                    <div class="shine-1"></div>
+                                    <div class="shine-2"></div>
+                                </div>
+                                <div class="bg-glow"></div>
+                                <div class="ripple"></div>
+                                <div class="noise">
+                                    <svg height="100%" width="100%">
+                                        <defs>
+                                            <pattern height="100" width="100" patternUnits="userSpaceOnUse" id="noise-pattern-1">
+                                                <filter y="0" x="0" id="noise-1">
+                                                    <feTurbulence stitchTiles="stitch" numOctaves="2" baseFrequency="0.65" type="fractalNoise" />
+                                                    <feBlend mode="screen" />
+                                                </filter>
+                                                <rect filter="url(#noise-1)" height="100" width="100" />
+                                            </pattern>
+                                        </defs>
+                                        <rect fill="url(#noise-pattern-1)" height="100%" width="100%" />
+                                    </svg>
+                                </div>
+                            </button>
+                        </div>
                     </div>
-                    <div class="small-text"><i class="fas fa-magic"></i> پس از وارد کردن دهمین رقم، نتیجه نمایش داده می‌شود</div>
+                    <div class="small-text">✨ پس از وارد کردن دهمین رقم، نتیجه نمایش داده می‌شود</div>
                 </div>
             </div>
         </div>
         
-        <div class="column">
+        <!-- ========== ستون دوم - کارت بنفش ========== -->
+        <div class="glow-card purple">
+            <div class="glow-inner"></div>
             <div class="column-header">
-                <i class="fas fa-search"></i> جستجوی عمومی در برهان
+                <span class="icon">🔍</span> جستجوی عمومی در برهان
             </div>
             <div class="column-body">
                 <div class="form-group">
                     <label>عبارت جستجو (نام و نام خانوادگی، کد/شناسه ملی، شماره اقتصادی، کد تفصیل، تلفن و ...)</label>
                     <div class="input-wrapper">
                         <input type="text" id="generalSearch" placeholder="مثال: احمدآبادی یا 09353984864">
-                        <button type="button" class="clear-btn" id="clearGeneralBtn"><i class="fas fa-times"></i></button>
+                        <div class="clear-btn-wrap">
+                            <input id="clearGeneralBtn" class="clear-btn-input" type="checkbox" />
+                            <button class="clear-btn" onclick="clearInput(this)">
+                                <div class="corner"></div>
+                                <div class="inner">
+                                    <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+                                    </svg>
+                                </div>
+                                <div class="led"></div>
+                                <div class="bg">
+                                    <div class="shine-1"></div>
+                                    <div class="shine-2"></div>
+                                </div>
+                                <div class="bg-glow"></div>
+                                <div class="ripple"></div>
+                                <div class="noise">
+                                    <svg height="100%" width="100%">
+                                        <defs>
+                                            <pattern height="100" width="100" patternUnits="userSpaceOnUse" id="noise-pattern-2">
+                                                <filter y="0" x="0" id="noise-2">
+                                                    <feTurbulence stitchTiles="stitch" numOctaves="2" baseFrequency="0.65" type="fractalNoise" />
+                                                    <feBlend mode="screen" />
+                                                </filter>
+                                                <rect filter="url(#noise-2)" height="100" width="100" />
+                                            </pattern>
+                                        </defs>
+                                        <rect fill="url(#noise-pattern-2)" height="100%" width="100%" />
+                                    </svg>
+                                </div>
+                            </button>
+                        </div>
                     </div>
-                    <div class="small-text"><i class="fas fa-search"></i> جستجو در همه ستون‌ها ( با رفع باگ فاصله بین کلمات )</div>
+                    <div class="small-text">🔍 جستجو در همه ستون‌ها (با رفع باگ فاصله بین کلمات)</div>
                 </div>
             </div>
         </div>
         
-        <div class="column">
+        <!-- ========== ستون سوم - کارت سبز ========== -->
+        <div class="glow-card green">
+            <div class="glow-inner"></div>
             <div class="column-header">
-                <i class="fas fa-city"></i> جستجوی کد شهر و استان (خودکار)
+                <span class="icon">🏙️</span> جستجوی کد شهر و استان (خودکار)
             </div>
             <div class="column-body">
                 <div class="form-group">
                     <label>نام شهر را وارد کنید</label>
                     <div class="input-wrapper">
-                        <input type="text" id="citySearch" placeholder="  مثال: مشهد یا اسفراین">
-                        <button type="button" class="clear-btn" id="clearCityBtn"><i class="fas fa-times"></i></button>
+                        <input type="text" id="citySearch" placeholder="مثال: مشهد یا اسفراین">
+                        <div class="clear-btn-wrap">
+                            <input id="clearCityBtn" class="clear-btn-input" type="checkbox" />
+                            <button class="clear-btn" onclick="clearInput(this)">
+                                <div class="corner"></div>
+                                <div class="inner">
+                                    <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+                                    </svg>
+                                </div>
+                                <div class="led"></div>
+                                <div class="bg">
+                                    <div class="shine-1"></div>
+                                    <div class="shine-2"></div>
+                                </div>
+                                <div class="bg-glow"></div>
+                                <div class="ripple"></div>
+                                <div class="noise">
+                                    <svg height="100%" width="100%">
+                                        <defs>
+                                            <pattern height="100" width="100" patternUnits="userSpaceOnUse" id="noise-pattern-3">
+                                                <filter y="0" x="0" id="noise-3">
+                                                    <feTurbulence stitchTiles="stitch" numOctaves="2" baseFrequency="0.65" type="fractalNoise" />
+                                                    <feBlend mode="screen" />
+                                                </filter>
+                                                <rect filter="url(#noise-3)" height="100" width="100" />
+                                            </pattern>
+                                        </defs>
+                                        <rect fill="url(#noise-pattern-3)" height="100%" width="100%" />
+                                    </svg>
+                                </div>
+                            </button>
+                        </div>
                     </div>
-                    <div class="small-text"><i class="fas fa-arrow-right"></i> پس از وارد کردن حداقل ۲ کاراکتر، نتایج نمایش داده می‌شوند</div>
+                    <div class="small-text">➡️ پس از وارد کردن حداقل ۲ کاراکتر، نتایج نمایش داده می‌شوند</div>
                 </div>
                 <div id="citySearchResult"></div>
             </div>
@@ -838,16 +1298,26 @@ if (isset($_GET['ajax'])) {
     
     <div class="result-container">
         <div class="result-header">
-            <div class="result-title"><i class="fas fa-clipboard-list"></i> نتیجه جستجو  :</div>
+            <div class="result-title">📋 نتیجه جستجو :</div>
             <div class="result-badge" id="resultBadge">در انتظار جستجو</div>
         </div>
         <div class="result-content" id="resultContent">
-            <div class="no-result"><i class="fas fa-search"></i> جستجویی انجام نشده است</div>
+            <div class="no-result">🔍 جستجویی انجام نشده است</div>
         </div>
     </div>
     
     <div class="footer">
-        <p><i class="fas fa-code"></i> Dev : Reza.ahmadabadi | <i class="fas fa-phone"></i> 09353984864</p>
+        <div>
+            <span class="footer-text-vaporize" id="footerVaporize">
+                <span class="dev-label">💻 Dev :</span>
+                <span class="highlight">Reza.ahmadabadi</span>
+                <span style="color:#adb5bd;margin:0 6px;">|</span>
+                <span style="color:#2d3436;">📞</span>
+                <span class="dev-phone">09353984864</span>
+            </span>
+        </div>
+        
+        <!-- لوگو -->
         <div style="margin-top: 10px;">
             <img src="/invoice-system-v2/assets/images/logo.png" alt="لوگو" style="max-height: 40px; width: auto; transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); cursor: pointer; position: relative;" onmouseover="this.style.transform='scale(1.5)'" onmouseout="this.style.transform='scale(1)'" onerror="this.style.display='none'">
         </div>
@@ -856,19 +1326,19 @@ if (isset($_GET['ajax'])) {
 
 <div id="adminModal" class="modal">
     <div class="modal-content">
-        <h3><i class="fas fa-lock"></i> ورود به پنل مدیریت</h3>
+        <h3>🔒 ورود به پنل مدیریت</h3>
         <p style="font-size:0.7rem;color:#6c757d;margin-bottom:12px;">برای اصلاح دیتابیس کدهای ملی</p>
         <input type="password" id="adminPassword" placeholder="رمز عبور مدیریت" style="text-align:center;">
         <div class="modal-buttons">
-            <button class="btn-save" onclick="checkAdminLogin()"><i class="fas fa-sign-in-alt"></i> ورود</button>
-            <button class="btn-cancel" onclick="closeAdminModal()"><i class="fas fa-times"></i> انصراف</button>
+            <button class="btn-save" onclick="checkAdminLogin()">🔑 ورود</button>
+            <button class="btn-cancel" onclick="closeAdminModal()">✕ انصراف</button>
         </div>
     </div>
 </div>
 
 <div id="requestCityModal" class="modal">
     <div class="modal-content">
-        <h3><i class="fas fa-edit"></i> درخواست اصلاح اطلاعات شهر</h3>
+        <h3>✏️ درخواست اصلاح اطلاعات شهر</h3>
         <p style="font-size:0.7rem;color:#6c757d;margin-bottom:12px;">لطفاً اطلاعات صحیح استان و شهر را وارد کنید</p>
         <input type="hidden" id="requestCode">
         <input type="hidden" id="requestProvince">
@@ -882,15 +1352,15 @@ if (isset($_GET['ajax'])) {
             <input type="text" id="suggestedCity" placeholder="مثال: مشهد">
         </div>
         <div class="modal-buttons">
-            <button class="btn-save" onclick="submitCityRequest()"><i class="fas fa-paper-plane"></i> ارسال درخواست</button>
-            <button class="btn-cancel" onclick="closeRequestModal()"><i class="fas fa-times"></i> انصراف</button>
+            <button class="btn-save" onclick="submitCityRequest()">📤 ارسال درخواست</button>
+            <button class="btn-cancel" onclick="closeRequestModal()">✕ انصراف</button>
         </div>
     </div>
 </div>
 
 <div id="requestNationalCodeModal" class="modal">
     <div class="modal-content">
-        <h3><i class="fas fa-plus-circle"></i> درخواست اضافه/اصلاح کد ملی</h3>
+        <h3>➕ درخواست اضافه/اصلاح کد ملی</h3>
         <p style="font-size:0.7rem;color:#6c757d;margin-bottom:12px;">اطلاعات صحیح استان و شهر را برای سه رقم اول کد ملی وارد کنید</p>
         <input type="hidden" id="requestNationalCodeValue">
         <div class="form-group">
@@ -906,63 +1376,249 @@ if (isset($_GET['ajax'])) {
             <input type="text" id="requestNationalCity" placeholder="مثال: مشهد">
         </div>
         <div class="modal-buttons">
-            <button class="btn-save" onclick="submitNationalCodeRequest()"><i class="fas fa-paper-plane"></i> ارسال درخواست</button>
-            <button class="btn-cancel" onclick="closeNationalCodeRequestModal()"><i class="fas fa-times"></i> انصراف</button>
+            <button class="btn-save" onclick="submitNationalCodeRequest()">📤 ارسال درخواست</button>
+            <button class="btn-cancel" onclick="closeNationalCodeRequestModal()">✕ انصراف</button>
         </div>
     </div>
 </div>
 
 <script>
+// ============================================
+// تابع پاک کردن فیلد
+// ============================================
+function clearInput(btn) {
+    // پیدا کردن والد .input-wrapper
+    const wrapper = btn.closest('.input-wrapper');
+    if (!wrapper) return;
+    
+    // پیدا کردن input داخل wrapper
+    const input = wrapper.querySelector('input[type="text"]');
+    if (!input) return;
+    
+    // پاک کردن مقدار input
+    input.value = '';
+    input.focus();
+    
+    // اضافه کردن انیمیشن به دکمه
+    btn.classList.add('active');
+    setTimeout(() => btn.classList.remove('active'), 400);
+    
+    // اگر input مربوط به کد ملی بود، نتیجه را پاک کن
+    if (input.id === 'nationalCode') {
+        document.getElementById('resultContent').innerHTML = '<div class="no-result">🔍 جستجویی انجام نشده است</div>';
+        document.getElementById('resultBadge').textContent = 'در انتظار جستجو';
+        window.lastNationalCode = '';
+    }
+    
+    // اگر input مربوط به جستجوی عمومی بود
+    if (input.id === 'generalSearch') {
+        document.getElementById('resultContent').innerHTML = '<div class="no-result">🔍 جستجویی انجام نشده است</div>';
+        document.getElementById('resultBadge').textContent = 'در انتظار جستجو';
+    }
+    
+    // اگر input مربوط به جستجوی شهر بود
+    if (input.id === 'citySearch') {
+        document.getElementById('citySearchResult').innerHTML = '';
+    }
+}
+
+// ============================================
+// اسکریپت افکت گلو (Glow Effect)
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.glow-card');
+    
+    function syncPointer(e) {
+        const x = e.clientX;
+        const y = e.clientY;
+        
+        cards.forEach(card => {
+            const rect = card.getBoundingClientRect();
+            const relativeX = x - rect.left;
+            const relativeY = y - rect.top;
+            
+            card.style.setProperty('--x', relativeX.toFixed(2));
+            card.style.setProperty('--xp', (x / window.innerWidth).toFixed(2));
+            card.style.setProperty('--y', relativeY.toFixed(2));
+            card.style.setProperty('--yp', (y / window.innerHeight).toFixed(2));
+        });
+    }
+    
+    document.addEventListener('pointermove', syncPointer);
+});
+
+// ============================================
+// انیمیشن لوگو (Zoom Fade)
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+    const logo = document.querySelector('.footer img');
+    if (logo) {
+        logo.addEventListener('click', function(e) {
+            if (this.classList.contains('zoom-fade')) return;
+            
+            this.classList.remove('zoom-fade', 'zoom-fade-back');
+            this.classList.add('zoom-fade');
+            
+            setTimeout(() => {
+                this.classList.remove('zoom-fade');
+                this.classList.add('zoom-fade-back');
+            }, 2000);
+            
+            setTimeout(() => {
+                this.classList.remove('zoom-fade-back');
+            }, 3500);
+        });
+    }
+});
+
+// ============================================
+// انیمیشن Vaporize برای متن فوتر (هر 1 دقیقه یک بار)
+// ============================================
+(function() {
+    const container = document.getElementById('footerVaporize');
+    if (!container) return;
+    
+    let isAnimating = false;
+    let animationTimer = null;
+    let intervalTimer = null;
+    
+    // تابع برای تبدیل متن به کاراکترهای جداگانه با span
+    function wrapChars(element) {
+        const text = element.textContent;
+        element.innerHTML = '';
+        
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i];
+            const span = document.createElement('span');
+            span.className = 'char';
+            span.textContent = char;
+            span.style.display = 'inline-block';
+            
+            // تنظیمات تصادفی برای هر کاراکتر
+            const tx = (Math.random() - 0.5) * 120;
+            const ty = (Math.random() - 0.5) * 80 - 20;
+            const rot = (Math.random() - 0.5) * 360;
+            span.style.setProperty('--tx', tx + 'px');
+            span.style.setProperty('--ty', ty + 'px');
+            span.style.setProperty('--rot', rot + 'deg');
+            
+            // تاخیر تصادفی برای هر کاراکتر
+            span.style.animationDelay = (Math.random() * 0.5) + 's';
+            
+            element.appendChild(span);
+        }
+    }
+    
+    // تابع برای بازگرداندن متن به حالت عادی با حفظ استایل رنگ
+    function resetText() {
+        const text = container.textContent;
+        container.innerHTML = text;
+        container.classList.remove('vaporizing', 'fading-in');
+        isAnimating = false;
+    }
+    
+    // تابع اجرای انیمیشن تبخیر
+    function startVaporizeAnimation() {
+        if (isAnimating) return;
+        isAnimating = true;
+        
+        // پاک کردن تایمر قبلی
+        if (animationTimer) {
+            clearTimeout(animationTimer);
+            animationTimer = null;
+        }
+        
+        // دریافت متن فعلی
+        const fullText = container.textContent;
+        if (!fullText || fullText.trim() === '') return;
+        
+        // تبدیل به کاراکترهای جداگانه
+        wrapChars(container);
+        
+        // شروع انیمیشن تبخیر
+        container.classList.add('vaporizing');
+        
+        // بعد از اتمام تبخیر، شروع به fade-in کنید
+        const vaporizeDuration = 1200; // 1.2 ثانیه
+        setTimeout(() => {
+            container.classList.remove('vaporizing');
+            container.classList.add('fading-in');
+            
+            // بعد از اتمام fade-in، متن را به حالت عادی برگردانید
+            const fadeDuration = 800; // 0.8 ثانیه
+            setTimeout(() => {
+                resetText();
+                isAnimating = false;
+            }, fadeDuration);
+        }, vaporizeDuration);
+    }
+    
+    // شروع انیمیشن با کلیک
+    container.addEventListener('click', function() {
+        if (!isAnimating) {
+            startVaporizeAnimation();
+        }
+    });
+    
+    // شروع خودکار بعد از 2 ثانیه بارگذاری
+    setTimeout(function() {
+        if (!isAnimating) {
+            startVaporizeAnimation();
+        }
+    }, 2000);
+    
+    // تنظیم تایمر برای اجرای هر 1 دقیقه (60000 میلی‌ثانیه)
+    function startInterval() {
+        if (intervalTimer) {
+            clearInterval(intervalTimer);
+            intervalTimer = null;
+        }
+        
+        intervalTimer = setInterval(function() {
+            if (!isAnimating) {
+                startVaporizeAnimation();
+            }
+        }, 60000); // 1 دقیقه
+    }
+    
+    startInterval();
+    
+    // در صورت خروج از صفحه، تایمر را پاک کنید
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+            if (intervalTimer) {
+                clearInterval(intervalTimer);
+                intervalTimer = null;
+            }
+        } else {
+            startInterval();
+        }
+    });
+})();
+
 // ==================== متغیرها ====================
 let nationalTimeout = null;
 let searchTimeout = null;
 let citySearchTimeout = null;
 let lastNationalCode = '';
 
-// ========== متغیرهای صفحه‌بندی (اضافه شود) ==========
 let currentPage = 1;
 let totalPages = 1;
 let currentKeyword = '';
 let currentSearchType = 'none';
-// ==================================================
+
 const nationalInput = document.getElementById('nationalCode');
 const generalInput = document.getElementById('generalSearch');
 const citySearchInput = document.getElementById('citySearch');
 const resultContent = document.getElementById('resultContent');
 const resultBadge = document.getElementById('resultBadge');
 const refreshCacheBtn = document.getElementById('refreshCacheBtn');
-const clearNationalBtn = document.getElementById('clearNationalBtn');
-const clearGeneralBtn = document.getElementById('clearGeneralBtn');
-const clearCityBtn = document.getElementById('clearCityBtn');
 const adminModal = document.getElementById('adminModal');
 const requestCityModal = document.getElementById('requestCityModal');
-// نمایش آخرین تاریخ بروزرسانی
+
 const lastUpdateSpan = document.getElementById('lastUpdateDate');
 if (lastUpdateSpan) {
     lastUpdateSpan.textContent = '<?php echo $lastUpdate; ?>';
-}
-// ==================== دکمه‌های پاک کردن ====================
-clearNationalBtn.onclick = () => {
-    nationalInput.value = '';
-    nationalInput.focus();
-    resultContent.innerHTML = '<div class="no-result">🔍 جستجویی انجام نشده است</div>';
-    resultBadge.textContent = 'در انتظار جستجو';
-    lastNationalCode = '';
-};
-
-clearGeneralBtn.onclick = () => {
-    generalInput.value = '';
-    generalInput.focus();
-    resultContent.innerHTML = '<div class="no-result">🔍 جستجویی انجام نشده است</div>';
-    resultBadge.textContent = 'در انتظار جستجو';
-};
-
-if (clearCityBtn) {
-    clearCityBtn.onclick = () => {
-        citySearchInput.value = '';
-        citySearchInput.focus();
-        document.getElementById('citySearchResult').innerHTML = '';
-    };
 }
 
 // ==================== توابع کمکی ====================
@@ -977,7 +1633,6 @@ function escapeHtml(str) {
 }
 
 function copyToClipboard(text) {
-    // روش جایگزین برای کپی
     const textarea = document.createElement('textarea');
     textarea.value = text;
     textarea.style.position = 'fixed';
@@ -1111,7 +1766,6 @@ function getCityCode(selectedValue) {
         .then(res => res.json())
         .then(data => {
             if (data.found && data.code) {
-                // به div اصلی margin-top اضافه کنید
                 let html = '<div style="display: flex; align-items: center; gap: 10px; background: #e9ecef; padding: 8px 12px; border-radius: 8px; margin-top: 18px;">';
                 html += '<span style="color: #e74c3c; font-family: monospace; font-size: 0.75rem;">' + escapeHtml(data.code) + '</span>';
                 html += '<button class="copy-btn" onclick="copyToClipboard(\'' + escapeHtml(data.code).replace(/'/g, "\\'") + '\')" style="padding: 4px 10px; background: #1a73e8; color: white; border: none; border-radius: 5px; cursor: pointer;">📋 کپی</button>';
@@ -1149,19 +1803,19 @@ function displayNationalResult(data) {
     
     if (data.valid && data.province && data.province !== '-') {
         html += '<div class="location-box">';
-        html += '<div><strong><i class="fas fa-map-marker-alt"></i> استان:</strong> ' + data.province + '</div>';
-        html += '<div><strong><i class="fas fa-city"></i> شهر:</strong> ' + data.city + '</div>';
+        html += '<div><strong>🗺️ استان:</strong> ' + data.province + '</div>';
+        html += '<div><strong>🏙️ شهر:</strong> ' + data.city + '</div>';
         html += '</div>';
         
         if (data.is_unknown) {
             html += '<button class="request-btn" onclick="openRequestModal(\'' + data.code + '\', \'' + data.province + '\', \'' + data.city + '\')">';
-            html += '<i class="fas fa-edit"></i> اطلاعات شهر صحیح نیست؟ درخواست اصلاح دهید</button>';
+            html += '✏️ اطلاعات شهر صحیح نیست؟ درخواست اصلاح دهید</button>';
         }
     }
     
     if (data.valid && data.is_national_unknown) {
         html += '<button class="request-national-btn" onclick="openNationalCodeRequestModal(\'' + data.code + '\')">';
-        html += '<i class="fas fa-plus-circle"></i> استان و شهر این کد ملی در دیتابیس نیست؟ درخواست اضافه دهید</button>';
+        html += '➕ استان و شهر این کد ملی در دیتابیس نیست؟ درخواست اضافه دهید</button>';
     }
       
     if (data.city_options && data.city_options.length > 0) {
@@ -1186,14 +1840,14 @@ function displayNationalResult(data) {
         html += '    <div style="font-size:0.75rem; margin-bottom:8px;">⚠️ عبارت "' + data.city + '" در فایل یافت نشد.</div>';
         html += '    <div style="font-size:0.75rem; margin-bottom:8px;">🔍 لطفاً عبارت دقیق جستجو را وارد کنید:</div>';
         html += '    <input type="text" id="manualCitySearch" placeholder="مثال: مشهد" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:8px; margin-bottom:8px;">';
-        html += '    <button onclick="searchManualCity()" class="copy-btn" style="width:100%; background:#1a73e8;">جستجو</button>';
+        html += '    <button onclick="searchManualCity()" class="copy-btn" style="width:100%; background:#1a73e8;">🔍 جستجو</button>';
         html += '    <div id="manualCityResult"></div>';
         html += '</div>';
     }
     
     if (data.excel_found && data.excel_results && data.excel_results.length > 0) {
         html += '<hr><div style="margin-top:12px;">';
-        html += '<strong style="font-size:0.8rem;"><i class="fas fa-file-excel"></i> نتایج جستجوی کد ملی در برهان  (' + data.excel_results.length + ' مورد):</strong>';
+        html += '<strong style="font-size:0.8rem;">📊 نتایج جستجوی کد ملی در برهان (' + data.excel_results.length + ' مورد):</strong>';
         html += '<div class="table-wrapper"><table class="excel-table"><thead>';
         
         let headers = Object.keys(data.excel_results[0].data);
@@ -1209,7 +1863,7 @@ function displayNationalResult(data) {
                 let val = data.excel_results[r].data[headers[c]] || '-';
                 html += '<td>' + escapeHtml(val);
                 if (headers[c] === 'عنوان لاتین' && val.length > 5 && /^\d+$/.test(val)) {
-                    html += '<button class="copy-btn" style="margin-right:8px;" onclick="copyToClipboard(\'' + escapeHtml(val).replace(/'/g, "\\'") + '\')"><i class="far fa-copy"></i></button>';
+                    html += '<button class="copy-btn" style="margin-right:8px;" onclick="copyToClipboard(\'' + escapeHtml(val).replace(/'/g, "\\'") + '\')">📋</button>';
                 }
                 html += '</div>';
             }
@@ -1229,7 +1883,7 @@ function checkNationalCode(code) {
     if (code === lastNationalCode) return;
     lastNationalCode = code;
     
-    resultContent.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> در حال بررسی کد ملی...</div>';
+    resultContent.innerHTML = '<div class="loading">⏳ در حال بررسی کد ملی...</div>';
     resultBadge.textContent = 'در حال بررسی...';
     
     fetch('?ajax=1&national_code=' + code)
@@ -1253,7 +1907,7 @@ function performSearch(keyword, page = 1) {
     currentPage = page;
     currentSearchType = 'general';
     
-    resultContent.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> در حال جستجو...</div>';
+    resultContent.innerHTML = '<div class="loading">⏳ در حال جستجو...</div>';
     resultBadge.textContent = 'در حال جستجو...';
     
     fetch(`?ajax=1&search=${encodeURIComponent(keyword)}&page=${page}`)
@@ -1273,7 +1927,7 @@ function performSearch(keyword, page = 1) {
                         let val = data.results[r].data[headers[c]] || '-';
                         html += '<td>' + escapeHtml(val);
                         if (headers[c] === 'عنوان لاتین' && val.length > 5 && /^\d+$/.test(val)) {
-                            html += '<button class="copy-btn" style="margin-right:8px;" onclick="copyToClipboard(\'' + escapeHtml(val).replace(/'/g, "\\'") + '\')"><i class="far fa-copy"></i></button>';
+                            html += '<button class="copy-btn" style="margin-right:8px;" onclick="copyToClipboard(\'' + escapeHtml(val).replace(/'/g, "\\'") + '\')">📋</button>';
                         }
                         html += '</td>';
                     }
@@ -1281,9 +1935,8 @@ function performSearch(keyword, page = 1) {
                 }
                 html += '</tbody></table></div>';
                 
-                // صفحه‌بندی
                 if (data.totalPages > 1) {
-                    html += '<div class="pagination" style="display:flex; justify-content:center; gap:8px; margin-top:15px; flex-wrap:wrap;">';
+                    html += '<div class="pagination">';
                     if (data.page > 1) {
                         html += '<button class="page-btn" onclick="performSearch(\'' + escapeHtml(keyword) + '\', ' + (data.page - 1) + ')" style="padding:5px 10px; border:1px solid #ddd; background:white; border-radius:5px; cursor:pointer;">« قبلی</button>';
                     }
@@ -1316,7 +1969,6 @@ function performSearch(keyword, page = 1) {
         });
 }
 
-// ==================== جستجوی خودکار شهر ====================
 if (citySearchInput) {
     citySearchInput.addEventListener('input', function(e) {
         const keyword = this.value.trim();
@@ -1329,7 +1981,7 @@ if (citySearchInput) {
             return;
         }
         
-        citySearchResultDiv.innerHTML = '<div class="loading" style="padding:15px;"><i class="fas fa-spinner fa-spin"></i> در حال جستجو...</div>';
+        citySearchResultDiv.innerHTML = '<div class="loading" style="padding:15px;">⏳ در حال جستجو...</div>';
         
         citySearchTimeout = setTimeout(() => {
             fetch('?ajax=1&city_search=' + encodeURIComponent(keyword))
@@ -1359,7 +2011,6 @@ if (citySearchInput) {
     });
 }
 
-// ==================== رویدادهای ورودی ====================
 nationalInput.addEventListener('input', function(e) {
     let value = this.value.replace(/[^0-9]/g, '').slice(0, 10);
     this.value = value;
@@ -1393,7 +2044,6 @@ generalInput.addEventListener('input', function(e) {
     searchTimeout = setTimeout(() => performSearch(keyword, 1), 300);
 });
 
-// جستجوی دستی شهر
 function searchManualCity() {
     var searchTerm = document.getElementById('manualCitySearch').value.trim();
     if (searchTerm.length < 2) {
@@ -1442,12 +2092,11 @@ function updateManualCityCode(selectedValue) {
     document.getElementById('manualCityCodeResult').innerHTML = html;
 }
 
-// ==================== بروزرسانی کش در پس‌زمینه ====================
 if (refreshCacheBtn) {
     refreshCacheBtn.onclick = function() {
         if (confirm('آیا از بروزرسانی کش اطمینان دارید؟')) {
             const originalText = this.innerHTML;
-            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> در حال بروزرسانی...';
+            this.innerHTML = '⏳ در حال بروزرسانی...';
             this.disabled = true;
             
             fetch('?ajax=1&refresh_cache=1')
@@ -1472,41 +2121,11 @@ if (refreshCacheBtn) {
     };
 }
 
-// بستن مودال با کلیک خارج
 window.onclick = function(e) {
     if (e.target === adminModal) closeAdminModal();
     if (e.target === requestCityModal) closeRequestModal();
     if (e.target === document.getElementById('requestNationalCodeModal')) closeNationalCodeRequestModal();
 };
-
-// ==================== انیمیشن زوم و محو لوگو ====================
-document.addEventListener('DOMContentLoaded', function() {
-    const logo = document.querySelector('.footer img');
-    if (logo) {
-        logo.addEventListener('click', function(e) {
-            // جلوگیری از چندبار کلیک همزمان
-            if (this.classList.contains('zoom-fade')) return;
-            
-            // حذف کلاس‌های قبلی
-            this.classList.remove('zoom-fade', 'zoom-fade-back');
-            
-            // اجرای انیمیشن محو شدن
-            this.classList.add('zoom-fade');
-            
-            // بعد از پایان محو شدن (2 ثانیه)، شروع به بازگشت کن
-            setTimeout(() => {
-                this.classList.remove('zoom-fade');
-                this.classList.add('zoom-fade-back');
-            }, 2000);
-            
-            // بعد از بازگشت (1.5 ثانیه)، کلاس بازگشت را حذف کن
-            setTimeout(() => {
-                this.classList.remove('zoom-fade-back');
-            }, 3500);
-        });
-    }
-});
-
 </script>
 </body>
 </html>

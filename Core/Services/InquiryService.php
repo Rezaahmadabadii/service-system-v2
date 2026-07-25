@@ -3,15 +3,73 @@
 
 namespace Core\Services;
 
+use Shuchkin\SimpleXLSX;
+
 class InquiryService
 {
     private $basePath;
-    private $filePattern;
 
     public function __construct($basePath)
     {
         $this->basePath = $basePath;
-        $this->filePattern = '/(\d{4})\s*[-_]\s*(\d{1,2})/';
+    }
+
+    /**
+     * پیدا کردن پوشه سال
+     */
+    private function findYearFolder($year)
+    {
+        if (!is_dir($this->basePath)) {
+            return null;
+        }
+
+        $folders = scandir($this->basePath);
+        foreach ($folders as $folder) {
+            if ($folder === '.' || $folder === '..') continue;
+            $fullPath = $this->basePath . DIRECTORY_SEPARATOR . $folder;
+            if (!is_dir($fullPath)) continue;
+            
+            // جستجوی دقیق‌تر برای پوشه سال
+            if (preg_match('/(\d{4})/', $folder, $matches)) {
+                if ($matches[1] == $year) {
+                    return $fullPath;
+                }
+            }
+            // اگر نام پوشه دقیقاً سال باشد
+            if ($folder == $year) {
+                return $fullPath;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * پیدا کردن فایل مربوط به سال و ماه مشخص
+     */
+    public function findFile($year, $month)
+    {
+        $yearFolder = $this->findYearFolder($year);
+        if (!$yearFolder) {
+            return null;
+        }
+
+        $month = str_pad($month, 2, '0', STR_PAD_LEFT);
+        $files = scandir($yearFolder);
+
+        foreach ($files as $file) {
+            if (!$this->isValidExcelFile($file)) continue;
+            
+            $info = $this->extractYearMonth($file);
+            if ($info && $info['year'] == $year && $info['month'] == $month) {
+                $fullPath = $yearFolder . DIRECTORY_SEPARATOR . $file;
+                if (file_exists($fullPath) || is_file($fullPath)) {
+                    return $fullPath;
+                }
+                return $fullPath;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -24,42 +82,229 @@ class InquiryService
             return $years;
         }
 
-        $files = scandir($this->basePath);
-        foreach ($files as $file) {
-            if ($this->isValidExcelFile($file)) {
-                $info = $this->extractYearMonth($file);
-                if ($info && !in_array($info['year'], $years)) {
-                    $years[] = $info['year'];
+        $folders = scandir($this->basePath);
+        foreach ($folders as $folder) {
+            if ($folder === '.' || $folder === '..') continue;
+            $fullPath = $this->basePath . DIRECTORY_SEPARATOR . $folder;
+            if (!is_dir($fullPath)) continue;
+            
+            // استخراج سال از نام پوشه
+            if (preg_match('/(\d{4})/', $folder, $matches)) {
+                $year = $matches[1];
+                // بررسی کنید که آیا در این پوشه حداقل یک فایل وجود دارد
+                $files = scandir($fullPath);
+                $hasFile = false;
+                foreach ($files as $file) {
+                    if ($this->isValidExcelFile($file)) {
+                        $hasFile = true;
+                        break;
+                    }
+                }
+                if ($hasFile) {
+                    $years[] = $year;
                 }
             }
         }
 
-        sort($years, SORT_DESC);
+        // مرتب‌سازی نزولی (جدیدترین سال اول)
+        rsort($years);
         return $years;
     }
 
     /**
-     * دریافت لیست ماه‌های موجود برای یک سال خاص
+     * دریافت لیست ماه‌های موجود برای یک سال
      */
     public function getAvailableMonths($year)
     {
         $months = [];
-        if (!is_dir($this->basePath)) {
-            return $months;
-        }
+        $yearFolder = $this->findYearFolder($year);
+        if (!$yearFolder) return $months;
 
-        $files = scandir($this->basePath);
+        $files = scandir($yearFolder);
+        $monthNames = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+        
         foreach ($files as $file) {
-            if ($this->isValidExcelFile($file)) {
+            if (!$this->isValidExcelFile($file)) continue;
+            
+            // تلاش برای استخراج ماه از نام فایل
+            $monthFound = null;
+            
+            // الگوی 1: عدد ماه (01 تا 12)
+            if (preg_match('/^(\d{2})\.(xlsx?|csv)$/i', $file, $matches)) {
+                $monthFound = (int)$matches[1];
+            }
+            // الگوی 2: عدد ماه بدون صفر (1 تا 12)
+            elseif (preg_match('/^(\d{1,2})\.(xlsx?|csv)$/i', $file, $matches)) {
+                $monthFound = (int)$matches[1];
+            }
+            // الگوی 3: نام ماه به فارسی
+            else {
+                foreach ($monthNames as $index => $name) {
+                    if (strpos($file, $name) !== false) {
+                        $monthFound = $index + 1;
+                        break;
+                    }
+                }
+            }
+            
+            // الگوی 4: برج سال XXXX - YY
+            if (!$monthFound) {
                 $info = $this->extractYearMonth($file);
                 if ($info && $info['year'] == $year) {
-                    $months[] = (int)$info['month'];
+                    $monthFound = (int)$info['month'];
+                }
+            }
+            
+            if ($monthFound && $monthFound >= 1 && $monthFound <= 12) {
+                $months[] = $monthFound;
+            }
+        }
+
+        // حذف تکراری‌ها و مرتب‌سازی
+        $months = array_unique($months);
+        sort($months);
+        return $months;
+    }
+
+    /**
+     * جستجوی نام در فایل اکسل با SimpleXLSX
+     */
+    public function searchInFile($filePath, $searchName, $specificDay = null)
+    {
+        if (!file_exists($filePath) && !is_file($filePath)) {
+            return [];
+        }
+
+        // کپی به پوشه موقت
+        $tempDir = sys_get_temp_dir() . '/excel_search_' . uniqid();
+        if (!is_dir($tempDir)) {
+            mkdir($tempDir, 0777, true);
+        }
+        $tempFile = $tempDir . '/' . basename($filePath);
+        copy($filePath, $tempFile);
+
+        require_once __DIR__ . '/../Helpers/simplexlsx.php';
+
+        $results = [];
+        $normalizedSearch = $this->normalizeText($searchName);
+
+        if ($xlsx = SimpleXLSX::parse($tempFile)) {
+            $sheetNames = $xlsx->sheetNames();
+
+            foreach ($sheetNames as $sheetIndex => $dayName) {
+                if (!is_numeric($dayName)) continue;
+                $dayNumber = (int)$dayName;
+
+                if ($specificDay !== null && $dayNumber != $specificDay) continue;
+
+                $rows = $xlsx->rows($sheetIndex);
+
+                // شروع از ردیف 2 (رد کردن هدرها)
+                for ($rowIndex = 2; $rowIndex < count($rows); $rowIndex++) {
+                    $row = $rows[$rowIndex];
+                    
+                    if (empty($row)) continue;
+
+                    $name = isset($row[2]) ? trim($row[2]) : '';
+                    $code = isset($row[1]) ? trim($row[1]) : '';
+                    $amount = isset($row[4]) ? trim($row[4]) : '';
+
+                    if (empty($name)) continue;
+                    if ($name === 'نام خانوادگی ونام') continue;
+                    if ($name === 'حواله روزانه') continue;
+                    if ($name === 'ردیف') continue;
+
+                    $normalizedName = $this->normalizeText($name);
+
+                    if (strpos($normalizedName, $normalizedSearch) !== false) {
+                        $results[] = [
+                            'day' => $dayNumber,
+                            'code' => $code,
+                            'name' => $name,
+                            'amount' => $this->formatAmount($amount),
+                            'similarity' => 100
+                        ];
+                    }
                 }
             }
         }
 
-        sort($months);
-        return array_unique($months);
+        // پاکسازی پوشه موقت
+        $files = glob($tempDir . '/*');
+        foreach ($files as $f) {
+            if (is_file($f)) unlink($f);
+        }
+        @rmdir($tempDir);
+
+        return $results;
+    }
+
+    /**
+     * دریافت کل واریزی‌های یک روز خاص
+     */
+    public function getAllTransfersForDate($year, $month, $day)
+    {
+        $filePath = $this->findFile($year, $month);
+        if (!$filePath) {
+            return [];
+        }
+
+        if (!file_exists($filePath) && !is_file($filePath)) {
+            return [];
+        }
+
+        $tempDir = sys_get_temp_dir() . '/excel_search_' . uniqid();
+        if (!is_dir($tempDir)) {
+            mkdir($tempDir, 0777, true);
+        }
+        $tempFile = $tempDir . '/' . basename($filePath);
+        copy($filePath, $tempFile);
+
+        require_once __DIR__ . '/../Helpers/simplexlsx.php';
+
+        $results = [];
+
+        if ($xlsx = SimpleXLSX::parse($tempFile)) {
+            $sheetNames = $xlsx->sheetNames();
+
+            foreach ($sheetNames as $sheetIndex => $dayName) {
+                if (!is_numeric($dayName)) continue;
+                if ((int)$dayName != $day) continue;
+
+                $rows = $xlsx->rows($sheetIndex);
+
+                // شروع از ردیف 2 (رد کردن هدرها)
+                for ($rowIndex = 2; $rowIndex < count($rows); $rowIndex++) {
+                    $row = $rows[$rowIndex];
+                    
+                    if (empty($row)) continue;
+
+                    $name = isset($row[2]) ? trim($row[2]) : '';
+                    $code = isset($row[1]) ? trim($row[1]) : '';
+                    $amount = isset($row[4]) ? trim($row[4]) : '';
+
+                    if (empty($name)) continue;
+                    if ($name === 'نام خانوادگی ونام') continue;
+                    if ($name === 'حواله روزانه') continue;
+                    if ($name === 'ردیف') continue;
+
+                    $results[] = [
+                        'day' => $day,
+                        'code' => $code,
+                        'name' => $name,
+                        'amount' => $this->formatAmount($amount)
+                    ];
+                }
+            }
+        }
+
+        $files = glob($tempDir . '/*');
+        foreach ($files as $f) {
+            if (is_file($f)) unlink($f);
+        }
+        @rmdir($tempDir);
+
+        return $results;
     }
 
     /**
@@ -70,8 +315,7 @@ class InquiryService
         if (empty($filename)) return false;
         if ($filename === '.' || $filename === '..') return false;
         if (strpos($filename, '~$') === 0) return false;
-        if (!preg_match('/\.xlsx?$/i', $filename)) return false;
-        
+        if (!preg_match('/\.(xlsx?|csv)$/i', $filename)) return false;
         return true;
     }
 
@@ -80,159 +324,34 @@ class InquiryService
      */
     private function extractYearMonth($filename)
     {
-        if (preg_match($this->filePattern, $filename, $matches)) {
+        // الگوی: برج سال XXXX - YY
+        $pattern = '/برج\s*سال\s*(\d{4})\s*[-_]\s*(\d{1,2})/';
+        if (preg_match($pattern, $filename, $matches)) {
             return [
                 'year' => $matches[1],
                 'month' => str_pad($matches[2], 2, '0', STR_PAD_LEFT)
             ];
         }
+        
+        // الگوی: سالXXXX-ماهYY
+        $pattern2 = '/سال(\d{4})[-_]ماه(\d{1,2})/';
+        if (preg_match($pattern2, $filename, $matches)) {
+            return [
+                'year' => $matches[1],
+                'month' => str_pad($matches[2], 2, '0', STR_PAD_LEFT)
+            ];
+        }
+        
+        // الگوی: YYYY-MM
+        $pattern3 = '/(\d{4})[-_](\d{1,2})/';
+        if (preg_match($pattern3, $filename, $matches)) {
+            return [
+                'year' => $matches[1],
+                'month' => str_pad($matches[2], 2, '0', STR_PAD_LEFT)
+            ];
+        }
+        
         return null;
-    }
-
-    /**
-     * پیدا کردن فایل مربوط به سال و ماه مشخص
-     */
-    public function findFile($year, $month)
-    {
-        if (!is_dir($this->basePath)) {
-            return null;
-        }
-
-        $month = str_pad($month, 2, '0', STR_PAD_LEFT);
-        $files = scandir($this->basePath);
-
-        foreach ($files as $file) {
-            if (!$this->isValidExcelFile($file)) continue;
-            
-            $info = $this->extractYearMonth($file);
-            if ($info && $info['year'] == $year && $info['month'] == $month) {
-                return $this->basePath . $file;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * جستجوی نام در فایل اکسل
-     */
-    public function searchInFile($filePath, $searchName, $specificDay = null)
-    {
-        if (!file_exists($filePath)) {
-            return [];
-        }
-
-        require_once __DIR__ . '/../../vendor/SpreadsheetReader.php';
-
-        $readerPath = __DIR__ . '/../../vendor/php-excel-reader';
-        set_include_path(get_include_path() . PATH_SEPARATOR . $readerPath);
-
-        $excelReaderFile = $readerPath . '/excel_reader2.php';
-        if (file_exists($excelReaderFile)) {
-            require_once $excelReaderFile;
-        }
-
-        $results = [];
-        $normalizedSearch = $this->normalizeText($searchName);
-
-        try {
-            $reader = new \SpreadsheetReader($filePath);
-            
-            foreach ($reader as $sheetIndex => $sheetData) {
-                // اگر روز خاصی مشخص شده، فقط آن روز را بررسی کن
-                if ($specificDay !== null && ($sheetIndex + 1) != $specificDay) {
-                    continue;
-                }
-
-                foreach ($sheetData as $row) {
-                    if (empty($row) || count($row) < 5) continue;
-                    
-                    $name = isset($row[2]) ? trim($row[2]) : '';
-                    $amount = isset($row[4]) ? trim($row[4]) : '';
-                    
-                    if (empty($name)) continue;
-                    
-                    $normalizedName = $this->normalizeText($name);
-                    
-                    // بررسی تطابق دقیق یا شباهت بالا
-                    if (strpos($normalizedName, $normalizedSearch) !== false) {
-                        $similarity = 100;
-                    } else {
-                        similar_text($normalizedName, $normalizedSearch, $similarity);
-                    }
-                    
-                    if ($similarity >= 80) {
-                        $results[] = [
-                            'day' => $sheetIndex + 1,
-                            'name' => $name,
-                            'amount' => $this->formatAmount($amount),
-                            'raw_amount' => $amount,
-                            'similarity' => round($similarity)
-                        ];
-                    }
-                }
-            }
-        } catch (\Exception $e) {
-            error_log("InquiryService error: " . $e->getMessage());
-        }
-
-        return $results;
-    }
-
-    /**
-     * دریافت کل واریزی‌های یک روز خاص (امروز یا دیروز)
-     */
-    public function getAllTransfersForDate($year, $month, $day)
-    {
-        $filePath = $this->findFile($year, $month);
-        if (!$filePath) {
-            return [];
-        }
-
-        if (!file_exists($filePath)) {
-            return [];
-        }
-
-        require_once __DIR__ . '/../../vendor/SpreadsheetReader.php';
-
-        $readerPath = __DIR__ . '/../../vendor/php-excel-reader';
-        set_include_path(get_include_path() . PATH_SEPARATOR . $readerPath);
-
-        $excelReaderFile = $readerPath . '/excel_reader2.php';
-        if (file_exists($excelReaderFile)) {
-            require_once $excelReaderFile;
-        }
-
-        $results = [];
-
-        try {
-            $reader = new \SpreadsheetReader($filePath);
-            
-            foreach ($reader as $sheetIndex => $sheetData) {
-                // فقط روز مورد نظر
-                if (($sheetIndex + 1) != $day) continue;
-
-                foreach ($sheetData as $row) {
-                    if (empty($row) || count($row) < 5) continue;
-                    
-                    $name = isset($row[2]) ? trim($row[2]) : '';
-                    $amount = isset($row[4]) ? trim($row[4]) : '';
-                    
-                    if (empty($name)) continue;
-                    
-                    $results[] = [
-                        'day' => $sheetIndex + 1,
-                        'name' => $name,
-                        'amount' => $this->formatAmount($amount),
-                        'raw_amount' => $amount
-                    ];
-                }
-            }
-        } catch (\Exception $e) {
-            error_log("InquiryService getAllTransfers error: " . $e->getMessage());
-        }
-
-        return $results;
     }
 
     /**
@@ -241,12 +360,10 @@ class InquiryService
     private function normalizeText($text)
     {
         if (empty($text)) return '';
-        
         $text = trim($text);
         $text = str_replace(['ي', 'ك', 'ى', 'ة', 'ئ'], ['ی', 'ک', 'ی', 'ه', 'ی'], $text);
         $text = str_replace(['أ', 'إ', 'آ'], ['ا', 'ا', 'ا'], $text);
-        $text = preg_replace('/\s+/', ' ', $text);
-        
+        $text = str_replace([' ', '‌'], '', $text);
         return mb_strtolower($text, 'UTF-8');
     }
 
@@ -256,16 +373,14 @@ class InquiryService
     private function formatAmount($amount)
     {
         if (is_numeric($amount)) {
-            return number_format($amount);
+            return number_format((int)$amount);
         }
-        
         if (is_string($amount)) {
             $clean = preg_replace('/[^0-9]/', '', $amount);
             if (!empty($clean)) {
                 return number_format((int)$clean);
             }
         }
-        
         return $amount ?: 'نامشخص';
     }
 
@@ -274,11 +389,7 @@ class InquiryService
      */
     public function getJalaliToday()
     {
-        return $this->gregorianToJalali(
-            date('Y'), 
-            date('n'), 
-            date('j')
-        );
+        return $this->gregorianToJalali(date('Y'), date('n'), date('j'));
     }
 
     public function getJalaliYesterday()
